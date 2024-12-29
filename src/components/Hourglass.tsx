@@ -1,11 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, forwardRef } from 'react';
 import gsap from 'gsap';
 import styled from 'styled-components';
 
-const HourglassContainer = styled.div`
+const HourglassContainer = styled.div<{ x: number; y: number }>`
   width: 100px;
   height: 160px;
-  position: relative;
+  position: absolute;
+  left: ${props => props.x}px;
+  top: ${props => props.y}px;
+  transition: transform 0.3s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
 `;
 
 const Glass = styled.div`
@@ -28,40 +35,68 @@ const Sand = styled.div`
 `;
 
 interface HourglassProps {
+  x: number;
+  y: number;
   onFill: () => void;
+  id: number;
 }
 
-export const Hourglass: React.FC<HourglassProps> = ({ onFill }) => {
-  const sandRef = useRef<HTMLDivElement>(null);
+export const Hourglass = forwardRef<HTMLDivElement, HourglassProps>(
+  ({ x, y, onFill, id }, ref) => {
+    const sandRef = useRef<HTMLDivElement>(null);
+    const [fillPercentage, setFillPercentage] = useState(0);
+    const timeline = useRef<gsap.core.Timeline | null>(null);
 
-  useEffect(() => {
-    if (!sandRef.current) return;
+    useEffect(() => {
+      if (!sandRef.current) return;
 
-    const tl = gsap.timeline({
-      repeat: -1,
-      onRepeat: onFill,
-    });
+      timeline.current = gsap.timeline({
+        repeat: -1,
+        onRepeat: onFill,
+      });
 
-    tl.fromTo(
-      sandRef.current,
-      { height: '0%' },
-      {
-        height: '100%',
-        duration: 20, // 5 minutes = 300 seconds
-        ease: 'linear',
+      timeline.current.fromTo(
+        sandRef.current,
+        { height: '0%' },
+        {
+          height: '100%',
+          duration: 300, // 5 minutes
+          ease: 'linear',
+          onUpdate: () => {
+            if (timeline.current) {
+              setFillPercentage(timeline.current.progress() * 100);
+            }
+          },
+        }
+      );
+
+      return () => {
+        if (timeline.current) {
+          timeline.current.kill();
+        }
+      };
+    }, [onFill]);
+
+    const addFill = (amount: number) => {
+      if (timeline.current) {
+        const newProgress = Math.min(1, timeline.current.progress() + amount / 100);
+        timeline.current.progress(newProgress);
       }
-    );
-
-    return () => {
-      tl.kill();
     };
-  }, [onFill]);
 
-  return (
-    <HourglassContainer>
-      <Glass>
-        <Sand ref={sandRef} />
-      </Glass>
-    </HourglassContainer>
-  );
+    return (
+      <HourglassContainer ref={ref} x={x} y={y} data-id={id}>
+        <Glass>
+          <Sand ref={sandRef} />
+        </Glass>
+      </HourglassContainer>
+    );
+  }
+);
+
+Hourglass.displayName = 'Hourglass';
+
+// Add this to make the addFill method accessible from outside
+export type HourglassRef = {
+  addFill: (amount: number) => void;
 }; 
