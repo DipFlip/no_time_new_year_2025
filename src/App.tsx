@@ -5,6 +5,8 @@ import { Hourglass, HourglassRef } from './components/Hourglass';
 import { BoardGame } from './components/BoardGame';
 import { Bird } from './components/Bird';
 import { Timeline } from './components/Timeline';
+import { Sparkle } from './components/Sparkle';
+import { Firework } from './components/Firework';
 
 const AppContainer = styled.div`
   min-height: 100vh;
@@ -53,34 +55,44 @@ interface HourglassPosition {
   id: number;
 }
 
+interface Effect {
+  id: number;
+  type: 'sparkle' | 'firework';
+  x: number;
+  y: number;
+}
+
 function App() {
   const [hourglassSpeed, setHourglassSpeed] = useState(1);
-  const hourglassRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const hourglassRefs = useRef<Map<number, HourglassRef>>(new Map());
+  const [effects, setEffects] = useState<Effect[]>([]);
+  const effectIdRef = useRef(0);
 
-  // Create 10 random positions for hourglasses with better spacing
-  const hourglassPositions: HourglassPosition[] = Array.from({ length: 10 }, (_, i) => {
-    const gridSize = Math.ceil(Math.sqrt(10));
-    const row = Math.floor(i / gridSize);
-    const col = i % gridSize;
-    
-    // Use viewport units for positioning
-    const cellWidth = window.innerWidth / gridSize;
-    const cellHeight = (window.innerHeight - 200) / gridSize; // Account for title and timeline
-    
-    // Add padding from edges
-    const padding = 100;
-    const availableWidth = window.innerWidth - padding * 2;
-    const availableHeight = window.innerHeight - 300; // Account for title and timeline
-    
-    return {
-      x: padding + (col * availableWidth / (gridSize - 1)),
-      y: padding + (row * availableHeight / (gridSize - 1)),
-      id: i,
-    };
-  });
+  const addEffect = (type: 'sparkle' | 'firework', x: number, y: number) => {
+    const id = effectIdRef.current++;
+    setEffects(prev => [...prev, { id, type, x, y }]);
+  };
 
-  const handleHourglassFill = useCallback(() => {
-    console.log('Hourglass filled!');
+  const removeEffect = (id: number) => {
+    setEffects(prev => prev.filter(effect => effect.id !== id));
+  };
+
+  // Create 10 fixed positions for hourglasses
+  const hourglassPositions: HourglassPosition[] = [
+    { x: 200, y: 150, id: 0 },  // Top left
+    { x: 500, y: 180, id: 1 },  // Top middle
+    { x: 800, y: 140, id: 2 },  // Top right
+    { x: 300, y: 300, id: 3 },  // Middle left
+    { x: 650, y: 320, id: 4 },  // Middle
+    { x: 900, y: 280, id: 5 },  // Middle right
+    { x: 180, y: 450, id: 6 },  // Bottom left
+    { x: 450, y: 480, id: 7 },  // Bottom middle
+    { x: 750, y: 440, id: 8 },  // Bottom right
+    { x: 1000, y: 400, id: 9 }, // Far right
+  ];
+
+  const handleHourglassFill = useCallback((x: number, y: number) => {
+    addEffect('firework', x, y);
   }, []);
 
   const handleRoundComplete = useCallback(() => {
@@ -89,7 +101,10 @@ function App() {
 
   const handleBirdNearHourglass = useCallback((birdX: number, birdY: number) => {
     hourglassRefs.current.forEach((hourglass, id) => {
-      const rect = hourglass.getBoundingClientRect();
+      const hourglassElement = document.querySelector(`[data-hourglass-id="${id}"]`);
+      if (!hourglassElement) return;
+
+      const rect = hourglassElement.getBoundingClientRect();
       const hourglassX = rect.left + rect.width / 2;
       const hourglassY = rect.top + rect.height / 2;
       
@@ -98,11 +113,10 @@ function App() {
         Math.pow(birdY - hourglassY, 2)
       );
 
-      if (distance < 50) {
-        console.log(`Bird near hourglass ${id}!`);
-        if (hourglass && 'addFill' in hourglass) {
-          (hourglass as any).addFill(10);
-        }
+      const detectionRadius = 100;
+      if (distance < detectionRadius) {
+        addEffect('sparkle', hourglassX, hourglassY);
+        hourglass.addFill(50);
       }
     });
   }, []);
@@ -117,8 +131,8 @@ function App() {
             id={pos.id}
             x={pos.x}
             y={pos.y}
-            onFill={handleHourglassFill}
-            ref={(el: HTMLDivElement | null) => {
+            onFill={() => handleHourglassFill(pos.x, pos.y)}
+            ref={(el: HourglassRef | null) => {
               if (el) {
                 hourglassRefs.current.set(pos.id, el);
               } else {
@@ -128,6 +142,23 @@ function App() {
           />
         ))}
         <Bird onHourglassHover={handleBirdNearHourglass} />
+        {effects.map(effect => (
+          effect.type === 'sparkle' ? (
+            <Sparkle
+              key={effect.id}
+              x={effect.x}
+              y={effect.y}
+              onComplete={() => removeEffect(effect.id)}
+            />
+          ) : (
+            <Firework
+              key={effect.id}
+              x={effect.x}
+              y={effect.y}
+              onComplete={() => removeEffect(effect.id)}
+            />
+          )
+        ))}
       </PlayArea>
       <TimelineSection>
         <Timeline duration={20} />
