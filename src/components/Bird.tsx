@@ -30,24 +30,29 @@ interface Position {
   y: number;
 }
 
-const PADDING = 30; // Reduced padding from edges
+const PADDING = 100; // Increased padding from edges
 
 export const Bird = ({ onHourglassHover }: BirdProps) => {
-  const [position, setPosition] = useState<Position>({ x: 20, y: 20 });
+  const [position, setPosition] = useState<Position>({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const [isFlying, setIsFlying] = useState(false);
   const [rotation, setRotation] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const getRandomPosition = useCallback(() => {
-    if (!wrapperRef.current) return { x: 20, y: 20 };
+    if (!wrapperRef.current) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
     const rect = wrapperRef.current.getBoundingClientRect();
+    
+    // Account for title and timeline
+    const topPadding = 100; // Space for title
+    const bottomPadding = 150; // Space for timeline
+    
     const maxX = rect.width - PADDING * 2;
-    const maxY = rect.height - PADDING * 2;
+    const maxY = rect.height - topPadding - bottomPadding;
 
     // Generate random position within bounds (in pixels)
     const x = Math.random() * maxX + PADDING;
-    const y = Math.random() * maxY + PADDING;
+    const y = Math.random() * maxY + topPadding;
 
     return { x, y };
   }, []);
